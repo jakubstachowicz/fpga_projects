@@ -34,7 +34,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity byte_display is
     Port ( byte_i : in STD_LOGIC_VECTOR (7 downto 0);
            clk_i : in STD_LOGIC;
-           latch_i : in STD_LOGIC;
+           latch_enable_i : in STD_LOGIC;
            rst_i : in STD_LOGIC;
            led7_an_o : out STD_LOGIC_VECTOR (3 downto 0);
            led7_seg_o : out STD_LOGIC_VECTOR (7 downto 0));
@@ -84,13 +84,15 @@ begin
         led7_an_o  => led7_an_o,
         led7_seg_o => led7_seg_o);
     
-    process(latch_i, rst_i)
+    process(clk_i, rst_i)
     begin
         if rst_i = '1' then
             digit <= (others => '1');
-        elsif rising_edge(latch_i) then
-            digit(15 downto 9) <= hex_to_seg_encode(byte_i(7 downto 4));
-            digit(7 downto 1) <= hex_to_seg_encode(byte_i(3 downto 0));
+        elsif rising_edge(clk_i) then
+            if latch_enable_i = '1' then
+                digit(15 downto 9) <= hex_to_seg_encode(byte_i(7 downto 4));
+                digit(7 downto 1) <= hex_to_seg_encode(byte_i(3 downto 0));
+            end if;
         end if;
     end process;
 
