@@ -68,7 +68,7 @@ architecture Behavioral of top is
                                    clk : in std_logic);
     end component kcpsm6;
     component program is
-      generic(             C_FAMILY : string := "S6"; 
+      generic(             C_FAMILY : string := "7S"; 
                   C_RAM_SIZE_KWORDS : integer := 1;
                C_JTAG_LOADER_ENABLE : integer := 0);
       Port (      address : in std_logic_vector(11 downto 0);
