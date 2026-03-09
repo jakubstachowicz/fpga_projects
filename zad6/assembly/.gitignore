@@ -1,0 +1,7 @@
+*.txt
+*.fmt
+*.fmt
+*.hex
+*.log
+*.vhd
+!ROM_form.vhd
