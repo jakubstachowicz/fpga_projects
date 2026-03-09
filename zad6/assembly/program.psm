@@ -1,0 +1,122 @@
+; pierwsze 16 bajtow zajmuje tablica translacji bajt -> 7seg display
+CONSTANT digit_o_b0, 10 ; pozycja czterech bajtow digit_o do manipulacji portem, little endian
+CONSTANT digit_o_b1, 11
+CONSTANT digit_o_b2, 12
+CONSTANT digit_o_b3, 13
+CONSTANT clock_ms_count_b0, 18 ; pozycja czterech bajtow licznika, starczy czasu, little endian
+CONSTANT clock_ms_count_b1, 19
+CONSTANT clock_ms_count_b2, 1A
+CONSTANT clock_ms_count_b3, 1B
+
+; reset vector
+ADDRESS 000
+    JUMP entrypoint
+
+entrypoint:
+    ; najpierw zerujemy licznik zegara 
+    LOAD s0, 00
+    STORE s0, clock_ms_count_b0
+    STORE s0, clock_ms_count_b1
+    STORE s0, clock_ms_count_b2
+    STORE s0, clock_ms_count_b3
+
+    ; potem zbudujemy tablice w scratch pad memory
+    LOAD s0, 00000001'b ; 0
+    STORE s0, 00    
+    LOAD s0, 01001111'b ; 1
+    STORE s0, 01    
+    LOAD s0, 00010010'b ; 2
+    STORE s0, 02    
+    LOAD s0, 00000110'b ; 3
+    STORE s0, 03    
+    LOAD s0, 01001100'b ; 4
+    STORE s0, 04    
+    LOAD s0, 00100100'b ; 5
+    STORE s0, 05    
+    LOAD s0, 00100000'b ; 6
+    STORE s0, 06    
+    LOAD s0, 00001111'b ; 7
+    STORE s0, 07    
+    LOAD s0, 00000000'b ; 8
+    STORE s0, 08    
+    LOAD s0, 00000100'b ; 9
+    STORE s0, 09    
+    LOAD s0, 00001000'b ; A
+    STORE s0, 0A    
+    LOAD s0, 01100000'b ; b
+    STORE s0, 0B    
+    LOAD s0, 00110001'b ; C
+    STORE s0, 0C    
+    LOAD s0, 01000010'b ; d
+    STORE s0, 0D    
+    LOAD s0, 00110000'b ; E
+    STORE s0, 0E    
+    LOAD s0, 00111000'b ; F
+    STORE s0, 0F
+
+    ; "Po resecie wyświetlacz powinien wyświetlić "0000"."
+    FETCH s1, 00 ; wczytaj reprezentacje zera
+    OUTPUT s1, 00
+    OUTPUT s1, 01
+    OUTPUT s1, 02
+    OUTPUT s1, 03
+
+    LOAD sF, 00 ; co pokazuje na wyswietlaczu
+    LOAD sD, 00 ; flaga zdarzenia czy zrobilem flip w tym cyklu
+
+    ; teraz wlaczam przerwania i czekam
+    ENABLE INTERRUPT
+
+    main_loop:
+        FETCH s1, (sF) ; wczytaj reprezentacje liczby do pokazania
+        OUTPUT s1, 00 ; pokaz na wyswietlaczu najmlodszym
+
+        ; czy licznik jest wielokrotnoscia 16?
+        FETCH sE, clock_ms_count_b0
+        AND sE, 0F
+        COMPARE sE, 00
+        JUMP Z, check_flip
+        LOAD sD, 00
+        JUMP main_loop
+
+        ; czy przy danym stanie licznika juz zrobilem flip?
+    check_flip:
+        COMPARE sD, 01
+        JUMP Z, main_loop
+
+        LOAD sD, 01
+
+        COMPARE sF, 00
+        JUMP Z, zmien_na_1
+        
+        zmien_na_0:
+            LOAD sF, 00
+            JUMP main_loop
+
+        zmien_na_1:
+            LOAD sF, 01
+            JUMP main_loop
+
+; w obsludze interrupt uzywam rejestrow od 8 do B
+; te rejestry przeznaczam tylko do obslugi przerwania
+; natomiast w kodzie "normalnym" uzywam 0 do 7 i C do F
+clock_interrupt:
+    FETCH s8, clock_ms_count_b0
+    FETCH s9, clock_ms_count_b1
+    FETCH sA, clock_ms_count_b2
+    FETCH sB, clock_ms_count_b3
+    ADD s8, 01
+    ADDCY s9, 00
+    ADDCY sA, 00
+    ADDCY sB, 00
+    STORE s8, clock_ms_count_b0
+    STORE s9, clock_ms_count_b1
+    STORE sA, clock_ms_count_b2
+    STORE sB, clock_ms_count_b3
+    
+    RETURNI ENABLE
+
+; interrupt vector
+ADDRESS 3FF
+    JUMP clock_interrupt
+    
