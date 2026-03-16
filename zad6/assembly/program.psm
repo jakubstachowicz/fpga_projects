@@ -93,6 +93,7 @@ update_buttons_state:
     main_button_update_loop:
         LOAD s7, 00
         STORE s7, (sB) ; na dobry poczatek dnia clearowanie flagi
+        OUTPUT s7, (sB) ; dane diagnostyczne
         FETCH s8, (sA)
         COMPARE s8, 00
         JUMP NZ, main_button_update_loop_decrement_ctr_continue
@@ -100,20 +101,24 @@ update_buttons_state:
         JUMP NC, force_0_press_bef_then_main_button_update_loop_continue
         LOAD s7, 0F ; no ustawiamy counter
         STORE s7, (sA) 
+        OUTPUT s7, (sA) ; dane diagnostyczne
         ; flage ustawiamy na podstawie pressed_before
         FETCH sD, (sC)
         TEST sD, 01 ; pressed before = 1 -> C=1 -> nie ustawiaj flagi
         JUMP C, main_button_update_loop_continue
         LOAD s7, 01  ; ustawiona flaga
         STORE s7, (sB) 
+        OUTPUT s7, (sB) ; dane diagnostyczne
         JUMP main_button_update_loop_continue
         main_button_update_loop_decrement_ctr_continue:
             SUB s8, 01
             JUMP NZ, just_store_in_main_button_update_loop_decrement_ctr_continue
             LOAD sD, 01
             STORE sD, (sC)
+            OUTPUT sD, (sC) ; dane diagnostyczne
         just_store_in_main_button_update_loop_decrement_ctr_continue:
             STORE s8, (sA)
+            OUTPUT s8, (sA) ; dane diagnostyczne
         main_button_update_loop_continue:
             ; rotacja
             SR0 s9
@@ -127,6 +132,7 @@ update_buttons_state:
         force_0_press_bef_then_main_button_update_loop_continue:
             LOAD sD, 00
             STORE sD, (sC)
+            OUTPUT sD, (sC) ; dane diagnostyczne
             JUMP main_button_update_loop_continue
 
 ; tests if should switch modes, sets the new state
@@ -136,6 +142,7 @@ switch_mode_test:
     FETCH s3, debounce_cntr_3
     FETCH s4, pressed_before_3
     ADD s3, s4
+    OUTPUT s3, FF  ; dane diagnostyczne (debounce_cntr_3 + pressed_before_3)
     JUMP Z, force_ctr_0_and_return
     ; teraz incrementujemy
     FETCH s8, switch_mode_cntr_b0
@@ -144,17 +151,22 @@ switch_mode_test:
     ADDCY s9, 00
     STORE s8, switch_mode_cntr_b0
     STORE s9, switch_mode_cntr_b1 ; ostatni zapis, teraz ifujemy
+    OUTPUT s8, switch_mode_cntr_b0 ; dane diagnostyczne
+    OUTPUT s9, switch_mode_cntr_b1 ; dane diagnostyczne
     TEST s9, 02  ; C=1 -> 512 ms minelo
-    JUMP change_modes_for_real
+    JUMP C, change_modes_for_real
     RETURN ; returnujemy jesli jeszcze nie zmieniamy mode'u
     change_modes_for_real:
         FETCH s3, edit_mode
         XOR s3, 01 ; flip the bit
         STORE s3, edit_mode
+        OUTPUT s3, edit_mode ; dane diagnostyczne
     force_ctr_0_and_return:
         LOAD s3, 00
         STORE s3, switch_mode_cntr_b0
         STORE s3, switch_mode_cntr_b1
+        OUTPUT s3, switch_mode_cntr_b0 ; dane diagnostyczne
+        OUTPUT s3, switch_mode_cntr_b1 ; dane diagnostyczne
     RETURN
 
 ; initialization and endless loop
@@ -205,6 +217,9 @@ entrypoint:
         LOAD s0, 01110001'b ; F
         STORE s0, 0F
 
+    ; printuje pierwsze zera
+    CALL print_to_7seg
+
     ; teraz wlaczam przerwania i czekam
     ENABLE INTERRUPT
     main_loop:
@@ -215,6 +230,7 @@ clock_interrupt:
     CALL update_buttons_state
     CALL switch_mode_test
     FETCH s8, edit_mode
+    OUTPUT s8, edit_mode  ; dane diagnostyczne o stanie maszyny (edit mode czy nie)
     COMPARE s8, 01
     JUMP NZ, clear_flash_cntr_and_just_print_already
     ; najpierw increment flash cntr
@@ -224,6 +240,8 @@ clock_interrupt:
     ADDCY s9, 00
     STORE s8, cursor_flash_cntr_b0
     STORE s9, cursor_flash_cntr_b1
+    OUTPUT s8, cursor_flash_cntr_b0  ; dane diagnostyczne flash counter
+    OUTPUT s9, cursor_flash_cntr_b1  ; dane diagnostyczne flash counter
     ; button_i(3) - przycisk BTNL
     ; button_i(2) - przycisk BTNR
     ; button_i(1) - przycisk BTNU
@@ -254,6 +272,7 @@ clock_interrupt:
         SUB sB, 01
         AND sB, 03
         STORE sB, cursor_select        
+        OUTPUT sB, cursor_select ; dane diagnostyczne
     next_comparison3:
         FETCH s8, button_press_3
         COMPARE s8, 01
@@ -261,6 +280,7 @@ clock_interrupt:
         ADD sB, 01
         AND sB, 03
         STORE sB, cursor_select  
+        OUTPUT sB, cursor_select ; dane diagnostyczne
     just_print_already:
         CALL print_to_7seg
     RETURNI ENABLE

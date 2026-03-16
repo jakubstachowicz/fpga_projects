@@ -136,7 +136,7 @@ begin
                 if port_id = "00000000" then digit(7 downto 0) <= out_port;
                 elsif port_id = "00000001" then digit(15 downto 8) <= out_port;
                 elsif port_id = "00000010" then digit(23 downto 16) <= out_port;
-                else digit(31 downto 24) <= out_port; end if;
+                elsif port_id = "00000011" then digit(31 downto 24) <= out_port; end if;
             end if;
             
             -- sprzetowy timer 1-milisekundowy
