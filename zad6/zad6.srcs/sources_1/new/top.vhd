@@ -88,6 +88,7 @@ architecture Behavioral of top is
     signal interrupt_ack : std_logic;
     signal digit : STD_LOGIC_VECTOR (31 downto 0);
     signal counter : unsigned (31 downto 0) := to_unsigned(0, 32);
+    constant hardware_clk_div_factor : unsigned (31 downto 0) := to_unsigned(1000, 32); -- normalny:  100000,  testy: 1000
 begin
     display_instance: display
     generic map ( clk_divide_factor => to_unsigned(25000, 32) )
@@ -139,10 +140,10 @@ begin
             end if;
             
             -- sprzetowy timer 1-milisekundowy
-            if counter = 99998 then
+            if counter = hardware_clk_div_factor - 2 then
                 interrupt <= '1';
                 counter <= counter + 1;
-            elsif counter = 99999 then
+            elsif counter = hardware_clk_div_factor - 1 then
                 interrupt <= '1';
                 counter <= to_unsigned(0, 32);
             else 

@@ -16,6 +16,7 @@ variables_in_mem:
     CONSTANT debounce_cntr_1, 15
     CONSTANT debounce_cntr_2, 16
     CONSTANT debounce_cntr_3, 17
+    CONSTANT debounce_cntr_4, 18 ; GUARD tablicy -> nie adres komorki!!
     CONSTANT button_press_0, 18  ; tablica[] flag button press, 0-1
     CONSTANT button_press_1, 19
     CONSTANT button_press_2, 1A
@@ -28,8 +29,12 @@ variables_in_mem:
     CONSTANT display_bin_val_3, 21
     CONSTANT cursor_flash_cntr_b0, 22  ; 2-bajtowy licznik do przeflashowania cursora w edit mode
     CONSTANT cursor_flash_cntr_b1, 23  
-    CONSTANT switch_mode_cntr, 24  ; licznik do zmiany stanu
-
+    CONSTANT switch_mode_cntr_b0, 24  ;  2-bajtowy licznik do zmiany stanu
+    CONSTANT switch_mode_cntr_b1, 25
+    CONSTANT pressed_before_0, 26  ; tablica pressed before. jesli jest 1 to znaczy ze kontynuujemy stare naduszenie guzika
+    CONSTANT pressed_before_1, 27
+    CONSTANT pressed_before_2, 28
+    CONSTANT pressed_before_3, 29
 
 ; increments counter from the beginning
 increment_general_counter:
@@ -53,12 +58,16 @@ print_to_7seg:
     ; czy ktorys trzeba "flashnac"
     output_real_values:
         FETCH sA, display_bin_val_0
+        FETCH sA, (sA)  ; translacja na znak 7seg
         OUTPUT sA, 00
         FETCH sA, display_bin_val_1
+        FETCH sA, (sA)  ; translacja na znak 7seg
         OUTPUT sA, 01
         FETCH sA, display_bin_val_2
+        FETCH sA, (sA)  ; translacja na znak 7seg
         OUTPUT sA, 02
         FETCH sA, display_bin_val_3
+        FETCH sA, (sA)  ; translacja na znak 7seg
         OUTPUT sA, 03
     FETCH sB, edit_mode
     TEST sB, 01  ; C-> jestem w edit modzie
@@ -71,29 +80,39 @@ print_to_7seg:
         RETURN
     turn_off_one_guy:
         FETCH sA, cursor_select  ; w sA wartosc wybranego kursora (portu)
-        OUTPUT FF, (sA)
+        LOAD s9, FF
+        OUTPUT s9, (sA)
     RETURN
 
 ; updates buttons + debounce protection, flags when button is pressed
 update_buttons_state:
     LOAD sA, debounce_cntr_0 ; adres
     LOAD sB, button_press_0  ; adres buttonpress do ustawienia
+    LOAD sC, pressed_before_0 ; adres pressed before
     INPUT s9, 00 ; w s9 jest stan guzikow
     main_button_update_loop:
         LOAD s7, 00
         STORE s7, (sB) ; na dobry poczatek dnia clearowanie flagi
         FETCH s8, (sA)
-        CMP s8, 00
+        COMPARE s8, 00
         JUMP NZ, main_button_update_loop_decrement_ctr_continue
         TEST s9, 01 ; C -> wcisniety guzik
-        JUMP NC, main_button_update_loop_continue
-        LOAD s7, 01
-        STORE s7, (sB) ; jej ustawiamy flage
-        LOAD s7, 0F
-        STORE s7, (sA) ; no i ustawiamy tez counter
+        JUMP NC, force_0_press_bef_then_main_button_update_loop_continue
+        LOAD s7, 0F ; no ustawiamy counter
+        STORE s7, (sA) 
+        ; flage ustawiamy na podstawie pressed_before
+        FETCH sD, (sC)
+        TEST sD, 01 ; pressed before = 1 -> C=1 -> nie ustawiaj flagi
+        JUMP C, main_button_update_loop_continue
+        LOAD s7, 01  ; ustawiona flaga
+        STORE s7, (sB) 
         JUMP main_button_update_loop_continue
         main_button_update_loop_decrement_ctr_continue:
-            SUB s8, 1
+            SUB s8, 01
+            JUMP NZ, just_store_in_main_button_update_loop_decrement_ctr_continue
+            LOAD sD, 01
+            STORE sD, (sC)
+        just_store_in_main_button_update_loop_decrement_ctr_continue:
             STORE s8, (sA)
         main_button_update_loop_continue:
             ; rotacja
@@ -101,13 +120,41 @@ update_buttons_state:
             ; i++ i sprawdzenie warunku
             ADD sA, 01
             ADD sB, 01
-            CMP sA, debounce_cntr_0 + 4
+            ADD sC, 01
+            COMPARE sA, debounce_cntr_4
             JUMP NZ, main_button_update_loop
     RETURN
+        force_0_press_bef_then_main_button_update_loop_continue:
+            LOAD sD, 00
+            STORE sD, (sC)
+            JUMP main_button_update_loop_continue
 
 ; tests if should switch modes, sets the new state
 switch_mode_test:
-    ; TODO
+    ; button_i(3) - przycisk BTNL
+    ; jesli debounce cntr >0 | pressed_before >0 <=> debounce cntr+ pressed_before =/= 0
+    FETCH s3, debounce_cntr_3
+    FETCH s4, pressed_before_3
+    ADD s3, s4
+    JUMP Z, force_ctr_0_and_return
+    ; teraz incrementujemy
+    FETCH s8, switch_mode_cntr_b0
+    FETCH s9, switch_mode_cntr_b1
+    ADD s8, 01
+    ADDCY s9, 00
+    STORE s8, switch_mode_cntr_b0
+    STORE s9, switch_mode_cntr_b1 ; ostatni zapis, teraz ifujemy
+    TEST s9, 02  ; C=1 -> 512 ms minelo
+    JUMP change_modes_for_real
+    RETURN ; returnujemy jesli jeszcze nie zmieniamy mode'u
+    change_modes_for_real:
+        FETCH s3, edit_mode
+        XOR s3, 01 ; flip the bit
+        STORE s3, edit_mode
+    force_ctr_0_and_return:
+        LOAD s3, 00
+        STORE s3, switch_mode_cntr_b0
+        STORE s3, switch_mode_cntr_b1
     RETURN
 
 ; initialization and endless loop
@@ -168,18 +215,25 @@ clock_interrupt:
     CALL update_buttons_state
     CALL switch_mode_test
     FETCH s8, edit_mode
-    CMP s8, 01
-    JUMP NZ, just_print_already
-    ; button_i(3) – przycisk BTNL
-    ; button_i(2) – przycisk BTNR
-    ; button_i(1) – przycisk BTNU
-    ; button_i(0) – przycisk BTND
-    STORE sA, display_bin_val_0 ; adres modyfikowanej komureczki
+    COMPARE s8, 01
+    JUMP NZ, clear_flash_cntr_and_just_print_already
+    ; najpierw increment flash cntr
+    FETCH s8, cursor_flash_cntr_b0
+    FETCH s9, cursor_flash_cntr_b1
+    ADD s8, 01
+    ADDCY s9, 00
+    STORE s8, cursor_flash_cntr_b0
+    STORE s9, cursor_flash_cntr_b1
+    ; button_i(3) - przycisk BTNL
+    ; button_i(2) - przycisk BTNR
+    ; button_i(1) - przycisk BTNU
+    ; button_i(0) - przycisk BTND
+    LOAD sA, display_bin_val_0 ; adres modyfikowanej komureczki
     FETCH sB, cursor_select  ; sB zawiera kursorek
     ADD sA, sB
     button_actions:
         FETCH s8, button_press_0
-        CMP s8, 01
+        COMPARE s8, 01
         JUMP NZ, next_comparison1
         FETCH s8, (sA)
         SUB s8, 01
@@ -187,7 +241,7 @@ clock_interrupt:
         STORE s8, (sA)
     next_comparison1:
         FETCH s8, button_press_1
-        CMP s8, 01
+        COMPARE s8, 01
         JUMP NZ, next_comparison2
         FETCH s8, (sA)
         ADD s8, 01
@@ -195,14 +249,14 @@ clock_interrupt:
         STORE s8, (sA)
     next_comparison2:
         FETCH s8, button_press_2
-        CMP s8, 01
+        COMPARE s8, 01
         JUMP NZ, next_comparison3
         SUB sB, 01
         AND sB, 03
         STORE sB, cursor_select        
     next_comparison3:
         FETCH s8, button_press_3
-        CMP s8, 01
+        COMPARE s8, 01
         JUMP NZ, just_print_already
         ADD sB, 01
         AND sB, 03
@@ -210,6 +264,11 @@ clock_interrupt:
     just_print_already:
         CALL print_to_7seg
     RETURNI ENABLE
+    clear_flash_cntr_and_just_print_already:
+        LOAD s9, 00
+        STORE s9, cursor_flash_cntr_b0
+        STORE s9, cursor_flash_cntr_b1
+        JUMP just_print_already
 
 ; interrupt vector
 ADDRESS 3FF
