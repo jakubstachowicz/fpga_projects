@@ -1,0 +1,149 @@
+----------------------------------------------------------------------------------
+-- Company: 
+-- Engineer: 
+-- 
+-- Create Date: 22.03.2026 01:04:49
+-- Design Name: 
+-- Module Name: tb - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx leaf cells in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+entity tb is
+--  Port ( );
+end tb;
+
+architecture Behavioral of tb is
+    signal clk_i : STD_LOGIC := '0';
+    signal RXD_i : STD_LOGIC := '1';
+    signal TXD_o : STD_LOGIC;
+    signal ld0 : STD_LOGIC;
+    signal led7_an_o : STD_LOGIC_VECTOR (3 downto 0);
+    signal led7_seg_o : STD_LOGIC_VECTOR (7 downto 0);
+
+    constant clk_period : time := 10 ns;
+    constant bit_time : time := 104167 ns; -- 1s/9600 bps
+
+    component top is
+        Port ( clk_i : in STD_LOGIC;
+               RXD_i : in STD_LOGIC;
+               TXD_o : out STD_LOGIC;
+               ld0 : out STD_LOGIC;
+               led7_an_o : out STD_LOGIC_VECTOR (3 downto 0);
+               led7_seg_o : out STD_LOGIC_VECTOR (7 downto 0));
+    end component top;
+
+    procedure UART_WRITE_BYTE (
+        i_data : in std_logic_vector(7 downto 0);
+        signal o_serial : out std_logic) is
+    begin
+        o_serial <= '0'; -- start bit
+        wait for bit_time;
+        for i in 0 to 7 loop -- data bits (LSB first)
+            o_serial <= i_data(i);
+            wait for bit_time;
+        end loop;
+        o_serial <= '1'; -- stop bit
+        wait for bit_time;
+    end procedure;
+
+begin
+    dut : top
+    port map (
+        clk_i => clk_i,
+        RXD_i => RXD_i,
+        TXD_o => TXD_o,
+        ld0 => ld0,
+        led7_an_o => led7_an_o,
+        led7_seg_o => led7_seg_o
+    );
+
+    clk_i <= not clk_i after 5 ns;
+
+    -- test for received data
+    pc_receiver_proc: process
+        variable v_recv_data : std_logic_vector(7 downto 0);
+        variable v_char : character;
+    begin
+        wait until falling_edge(TXD_o);
+
+        wait for bit_time / 2; -- start bit, middle
+        
+        if TXD_o = '0' then
+            for i in 0 to 7 loop
+                wait for bit_time;
+                v_recv_data(i) := TXD_o;
+            end loop;
+
+            wait for bit_time; -- stop bit skipping
+
+            v_char := character'val(to_integer(unsigned(v_recv_data)));
+            
+            report ">>> UART RECEIVED: " & 
+                   integer'image(to_integer(unsigned(v_recv_data))) & 
+                   " (ASCII: '" & v_char & "')" severity note;
+        end if;
+    end process;
+
+    stim: process
+    begin
+        wait for 1 ms;
+
+        report "--- TEST 1: string 'TEST' + ENTER ---";
+        UART_WRITE_BYTE(x"54", RXD_i); -- 'T'
+        wait for bit_time;
+        UART_WRITE_BYTE(x"45", RXD_i); -- 'E'
+        wait for bit_time;
+        UART_WRITE_BYTE(x"53", RXD_i); -- 'S'
+        wait for bit_time;
+        UART_WRITE_BYTE(x"54", RXD_i); -- 'T'
+        wait for bit_time;
+        UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
+        
+        wait for bit_time * 50;
+
+        report "--- TEST 2: 18 characters ---";
+        for i in 0 to 17 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+
+        wait for bit_time * 210;
+
+
+        report "--- TEST 3: 24 characters + ENTER ---";
+        for i in 0 to 23 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+        UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
+        
+        wait for bit_time * 260;
+
+        report "--- FIN ---";
+        std.env.stop;
+    end process;
+
+end Behavioral;
