@@ -1,0 +1,4 @@
+lex.yy.c
+*.tab.*
+uart_parser
+uart_parser.*
