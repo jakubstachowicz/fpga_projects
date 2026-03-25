@@ -44,9 +44,12 @@ architecture Behavioral of tb is
     signal led7_seg_o : STD_LOGIC_VECTOR (7 downto 0);
 
     constant clk_period : time := 10 ns;
-    constant bit_time : time := 104167 ns; -- 1s/9600 bps
+    constant bit_time : time := 8680 ns; -- 1s/115200 bps
 
     component top is
+        -- speed_div_factor = clk_speed / (2 * uart_speed)
+        -- e.g. for 100 MHz clk and 9600 bps uart: 100 000 000 / (2 * 9600) = 5208
+        Generic ( speed_div_factor : unsigned (15 downto 0) := to_unsigned(5208, 16) );
         Port ( clk_i : in STD_LOGIC;
                RXD_i : in STD_LOGIC;
                TXD_o : out STD_LOGIC;
@@ -71,6 +74,9 @@ architecture Behavioral of tb is
 
 begin
     dut : top
+    generic map (
+        speed_div_factor => to_unsigned(434, 16)  -- 115200 bps
+    )
     port map (
         clk_i => clk_i,
         RXD_i => RXD_i,
@@ -122,7 +128,7 @@ begin
         wait for bit_time;
         UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         
-        wait for bit_time * 50;
+        wait for bit_time * 60 * 128;
 
         report "--- TEST 2: 18 characters ---";
         for i in 0 to 17 loop
@@ -130,7 +136,7 @@ begin
             wait for bit_time / 2;
         end loop;
 
-        wait for bit_time * 210;
+        wait for bit_time * 220 * 128;
 
 
         report "--- TEST 3: 24 characters + ENTER ---";
@@ -140,7 +146,7 @@ begin
         end loop;
         UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         
-        wait for bit_time * 260;
+        wait for bit_time * 270 * 128;
 
         report "--- FIN ---";
         std.env.stop;

@@ -24,7 +24,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
---use IEEE.NUMERIC_STD.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
 -- Uncomment the following library declaration if instantiating
 -- any Xilinx leaf cells in this code.
@@ -32,6 +32,9 @@ use IEEE.STD_LOGIC_1164.ALL;
 --use UNISIM.VComponents.all;
 
 entity top is
+    -- speed_div_factor = clk_speed / (2 * uart_speed)
+    -- e.g. for 100 MHz clk and 9600 bps uart: 100 000 000 / (2 * 9600) = 5208
+    Generic ( speed_div_factor : unsigned (15 downto 0) := to_unsigned(5208, 16) );
     Port ( clk_i : in STD_LOGIC;
            RXD_i : in STD_LOGIC;
            TXD_o : out STD_LOGIC;
@@ -42,6 +45,9 @@ end top;
 
 architecture Behavioral of top is
     component fifo_receiver_display is
+        -- speed_div_factor = clk_speed / (2 * uart_speed)
+        -- e.g. for 100 MHz clk and 9600 bps uart: 100 000 000 / (2 * 9600) = 5208
+        Generic ( speed_div_factor : unsigned (15 downto 0) := to_unsigned(5208, 16) );
         Port ( -- clock and uart interface
                clk_i : in STD_LOGIC;
                RXD_i : in STD_LOGIC;
@@ -60,6 +66,9 @@ architecture Behavioral of top is
     end component fifo_receiver_display;
     
     component fifo_reader_sender is
+        -- speed_div_factor = clk_speed / (2 * uart_speed)
+        -- e.g. for 100 MHz clk and 9600 bps uart: 100 000 000 / (2 * 9600) = 5208
+        Generic ( speed_div_factor : unsigned (15 downto 0) := to_unsigned(5208, 16) );
         Port ( -- clock and uart interface
             clk_i : in STD_LOGIC;
             TXD_o : out STD_LOGIC;
@@ -82,6 +91,9 @@ architecture Behavioral of top is
 
 begin
     fifo_receiver_display_instance : fifo_receiver_display
+    generic map (
+        speed_div_factor => speed_div_factor
+    )
     port map (
         clk_i => clk_i,
         RXD_i => RXD_i,
@@ -97,6 +109,9 @@ begin
     );
     
     fifo_reader_sender_instance : fifo_reader_sender
+    generic map (
+        speed_div_factor => speed_div_factor
+    )
     port map (
         clk_i => clk_i,
         TXD_o => TXD_o,

@@ -32,6 +32,9 @@ use IEEE.NUMERIC_STD.ALL;
 --use UNISIM.VComponents.all;
 
 entity fifo_receiver_display is
+    -- speed_div_factor = clk_speed / (2 * uart_speed)
+    -- e.g. for 100 MHz clk and 9600 bps uart: 100 000 000 / (2 * 9600) = 5208
+    Generic ( speed_div_factor : unsigned (15 downto 0) := to_unsigned(5208, 16) );
     Port ( -- clock and uart interface
            clk_i : in STD_LOGIC;
            RXD_i : in STD_LOGIC;
@@ -106,6 +109,9 @@ begin
     );
 
     uart_receiver_instance : uart_receiver
+    generic map (
+        speed_div_factor => speed_div_factor
+    )
     port map (
         clk_i => clk_i,
         rst_i => '0',
