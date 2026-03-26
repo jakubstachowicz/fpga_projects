@@ -129,6 +129,7 @@ begin
         UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         
         wait for bit_time * 60 * 128;
+        
 
         report "--- TEST 2: 18 characters ---";
         for i in 0 to 17 loop
@@ -147,6 +148,35 @@ begin
         UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         
         wait for bit_time * 270 * 128;
+        
+        
+        report "--- TEST 4: 90 characters (buffer overflow) ---";
+        for i in 0 to 89 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#30# + (i mod 10), 8)), RXD_i); 
+            wait for bit_time / 2;
+        end loop;
+        
+        wait for bit_time * 930 * 128;
+        
+        
+        report "--- TEST 5: 24 characters + ENTER bis ---";
+        for i in 0 to 23 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+        UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
+        
+        wait for bit_time * 270 * 128;
+        
+        
+        report "--- TEST 6: characters under 32 + ENTER ---";
+        for i in 0 to 5 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(15 + i, 8)), RXD_i);  
+            wait for bit_time / 2;
+        end loop;
+        UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
+        
+        wait for bit_time * 90 * 128;
 
         report "--- FIN ---";
         std.env.stop;

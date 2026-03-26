@@ -74,8 +74,9 @@ architecture Behavioral of fifo_reader_sender is
         UNLOADING, --> UNLOADING_FLIP_RD_EN, SENDING_LINE
         UNLOADING_FLIP_RD_EN, --> UNLOADING_FLIP_RD_EN (comeback)
         SENDING_LINE, --> SENDING_CHAR, IDLE
-        SENDING_CHAR, --> SENDING_PIXEL, SENDING_UART_LINEFEED_WAIT
-        SENDING_UART_LINEFEED_WAIT, --> SENDING_LINE (2-deep comeback)
+        SENDING_CHAR, --> SENDING_PIXEL, SENDING_UART_CR_WAIT
+        SENDING_UART_CR_WAIT, --> SENDING_UART_LINEFEED_WAIT
+        SENDING_UART_LINEFEED_WAIT, --> SENDING_LINE (3-deep comeback)
         SENDING_PIXEL, --> SENDING_PIXEL_FETCH, SENDING_CHAR (comeback)
         SENDING_PIXEL_FETCH, --> SENDING_FETCHED_PIXEL
         SENDING_FETCHED_PIXEL, --> SENDING_UART_WAIT
@@ -169,10 +170,20 @@ begin
                         state <= SENDING_PIXEL;
                     end if;
                 else
+                    uart_data <= "00001101";
+                    lock_and_send <= '1';
+                    state <= SENDING_UART_CR_WAIT;
+                end if;                
+            elsif state = SENDING_UART_CR_WAIT then
+                if lock_and_send = '1' then
+                    if send_confirm = '1' then 
+                        lock_and_send <= '0';
+                    end if;
+                else 
                     uart_data <= "00001010";
                     lock_and_send <= '1';
                     state <= SENDING_UART_LINEFEED_WAIT;
-                end if;                
+                end if;
             elsif state = SENDING_UART_LINEFEED_WAIT then
                 if send_confirm = '1' then 
                     lock_and_send <= '0';
@@ -189,7 +200,7 @@ begin
             elsif state = SENDING_PIXEL_FETCH then
                 state <= SENDING_FETCHED_PIXEL;
             elsif state = SENDING_FETCHED_PIXEL then
-                if rom_douta(pixel_ctr - 1) = '0' then
+                if rom_douta(8 - pixel_ctr) = '0' then
                     uart_data <= "00100000";
                 else 
                     if unsigned(ram(char_ctr - 1)) < 32 or unsigned(ram(char_ctr - 1)) > 127 then
