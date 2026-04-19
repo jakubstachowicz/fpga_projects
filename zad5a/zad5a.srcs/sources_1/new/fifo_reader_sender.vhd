@@ -138,7 +138,10 @@ begin
                     size <= 0;
                 end if;
             elsif state = UNLOADING then
-                if fifo_empty = '0' then
+                if size = 18 and fifo_empty = '0' then
+                    state <= SENDING_LINE; -- basically to samo co przy elsie, ale tym razem nie clearujemy flagi by zaraz znowu przejsc do rozladunku i printowania po wejsciu w IDLE
+                    line_ctr <= 0;
+                elsif fifo_empty = '0' then
                     ram(size) <= fifo_dout;
                     size <= size + 1;
                     fifo_read_enable <= '1';

@@ -44,7 +44,7 @@ architecture Behavioral of tb is
     signal led7_seg_o : STD_LOGIC_VECTOR (7 downto 0);
 
     constant clk_period : time := 10 ns;
-    constant bit_time : time := 8680 ns; -- 1s/115200 bps
+    constant bit_time : time := 800 ns; -- 1s/1250000 bps
 
     component top is
         -- speed_div_factor = clk_speed / (2 * uart_speed)
@@ -75,7 +75,7 @@ architecture Behavioral of tb is
 begin
     dut : top
     generic map (
-        speed_div_factor => to_unsigned(434, 16)  -- 115200 bps
+        speed_div_factor => to_unsigned(40, 16)  -- 1250000 bps
     )
     port map (
         clk_i => clk_i,
@@ -117,7 +117,7 @@ begin
     begin
         wait for 1 ms;
 
-        report "--- TEST 1: string 'TEST' + ENTER ---";
+        report "--- TEST 1: string 'TEST' + ENTER + ENTER ---";
         UART_WRITE_BYTE(x"54", RXD_i); -- 'T'
         wait for bit_time;
         UART_WRITE_BYTE(x"45", RXD_i); -- 'E'
@@ -125,6 +125,8 @@ begin
         UART_WRITE_BYTE(x"53", RXD_i); -- 'S'
         wait for bit_time;
         UART_WRITE_BYTE(x"54", RXD_i); -- 'T'
+        wait for bit_time;
+        UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         wait for bit_time;
         UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         
@@ -177,6 +179,29 @@ begin
         UART_WRITE_BYTE(x"0D", RXD_i); -- ENTER 
         
         wait for bit_time * 90 * 128;
+        
+        
+        report "--- TEST 7: 7 characters sent x3 with wait time + long wait and 15 sent ---";
+        for i in 0 to 6 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+        wait for bit_time * 90 * 128;
+        for i in 0 to 6 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+        wait for bit_time * 90 * 128;
+        for i in 0 to 6 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+        wait for bit_time * 250 * 128;
+        for i in 0 to 14 loop
+            UART_WRITE_BYTE(std_logic_vector(to_unsigned(16#41# + i, 8)), RXD_i);
+            wait for bit_time / 2;
+        end loop;
+        wait for bit_time * 250 * 128;
 
         report "--- FIN ---";
         std.env.stop;
